@@ -13,7 +13,7 @@ BUTTON_WIDTH = 120
 MAP_WIDTH = REC_X_NUM//2 * REC_SIZE + REC_X_NUM//2 * WALL_SIZE + WALL_SIZE
 MAP_HEIGHT = REC_Y_NUM//2 * REC_SIZE + REC_Y_NUM//2 * WALL_SIZE + WALL_SIZE
 MAP_REDUCE_RATIO = 10
-MAPS_INTERVAL = 20
+MAPS_INTERVAL = 10
 SMALL_MAP_WIDTH = MAP_WIDTH//MAP_REDUCE_RATIO
 SCREEN_WIDTH = min(900, MAP_WIDTH)
 SCREEN_HEIGHT = min(500, MAP_HEIGHT) + BUTTON_HEIGHT
@@ -254,7 +254,31 @@ class ScreenShow():
 	def screenToSmallMapRect(self, screen_x, screen_y, width, height):
 		map_x, map_y = self.screenToMapPos(screen_x, screen_y)
 		return self.getSmallMapRect(map_x, map_y, width, height, MAP_REDUCE_RATIO)
-		
+
+	def getScreenRect(self, screen_x, screen_y, width, height):
+		if screen_x < 0:
+			image_width = width + screen_x
+			image_offset_x = -screen_x
+			screen_x = 0
+		elif screen_x > self.width - width:
+			image_width = self.width - screen_x
+			image_offset_x = 0
+		else:
+			image_width = width
+			image_offset_x = 0
+
+		if screen_y < 0:
+			image_height = height + screen_y
+			image_offset_y = - screen_y
+			screen_y = 0
+		elif screen_y > self.height - height:
+			image_height = self.height - screen_y
+			image_offset_y = 0
+		else:
+			image_height = height
+			image_offset_y = 0
+		return (screen_x, screen_y, image_offset_x, image_offset_y, image_width, image_height)
+
 	def drawBackground(self, screen):		
 		for y in range(self.map.height):
 			for x in range(self.map.width):
@@ -280,18 +304,21 @@ class ScreenShow():
 				pygame.draw.rect(screen, color, pygame.Rect(small_location_x, small_location_y, small_width, small_height))
 				
 				# draw map
-				if (screen_x >= 0 and screen_x < self.width and 
-					screen_y >= 0 and screen_y < self.height):
-					location_x, location_y = self.getDrawLoaction(screen_x, screen_y)
-					if screen_x + width > self.width:
+				if (screen_x > -width and screen_x < self.width and
+					screen_y > -height and screen_y < self.height):
+					if screen_x < 0:
+						width = width + screen_x
+						screen_x = 0
+					elif screen_x + width > self.width:
 						width = self.width - screen_x
-					if screen_y + height > self.height:
+					
+					if screen_y < 0:
+						height = height + screen_y
+						screen_y = 0
+					elif screen_y + height > self.height:
 						height = self.height - screen_y
+					
+					location_x, location_y = self.getDrawLoaction(screen_x, screen_y)
 					pygame.draw.rect(screen, color, pygame.Rect(location_x, location_y, width, height))
 
 				
-				
-				
-				
-				
-

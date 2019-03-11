@@ -74,9 +74,10 @@ class EnemyEntity(object):
 			screen_x, screen_y = screen_show.mapToScreenPos(self.location[0], self.location[1])
 			if (screen_x > -self.rect.width and screen_x < screen_show.width and 
 				screen_y > -self.rect.height and screen_y < screen_show.height):
+				screen_x, screen_y, image_offset_x, image_offset_y, width, height = screen_show.getScreenRect(screen_x, screen_y, self.rect.width, self.rect.height)
 				location_x, location_y = screen_show.getDrawLoaction(screen_x, screen_y)
 				self.image = self.entity_surface.updateImage()
-				screen.blit(self.image, (location_x, location_y, self.rect.width, self.rect.height))
+				screen.blit(self.image, (location_x, location_y), (image_offset_x, image_offset_y, width, height))
 				
 				# draw hero in small map
 				color = (0, 255, 0)
@@ -152,7 +153,7 @@ class EnemyStateIdle(State):
 		return None
 	
 	def enter_actions(self):
-		self.enemy.speed = 20 + randint(-10, 10)
+		self.enemy.speed = 20 + randint(0, 10)
 
 def getMoveDirection(start_x, start_y, end_x, end_y):
 	if start_x < end_x:
@@ -245,6 +246,7 @@ class EnemyStateBack(State):
 		return None
 	
 	def enter_actions(self):
+		self.enemy.speed = 20 + randint(-10, 0)
 		self.target = (randint(self.room.x, self.room.x+ self.room.width-1), randint(self.room.y, self.room.y+ self.room.height-1))
 		self.distance = 0
 		print("enemy(%d,%d) back to room(%d, %d)" % (self.enemy.location[0], self.enemy.location[1], self.target[0], self.target[1]))

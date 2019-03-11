@@ -44,7 +44,7 @@ class Button():
 class Game():
 	def __init__(self):
 		pygame.init()
-		self.screen = pygame.display.set_mode([SCREEN_WIDTH + MAPS_INTERVAL + SMALL_MAP_WIDTH, SCREEN_HEIGHT + BUTTON_HEIGHT])
+		self.screen = pygame.display.set_mode([SCREEN_WIDTH + MAPS_INTERVAL + SMALL_MAP_WIDTH + MAPS_INTERVAL, SCREEN_HEIGHT + BUTTON_HEIGHT])
 		self.clock = pygame.time.Clock()
 		self.map = Map(REC_X_NUM, REC_Y_NUM)
 		self.screen_show = ScreenShow(SCREEN_WIDTH, SCREEN_HEIGHT, 0, BUTTON_HEIGHT, self.map)
@@ -61,7 +61,11 @@ class Game():
 		
 	def play(self):			
 		time_passed = self.clock.tick(FRAME_RATE)		
-				
+
+		pygame.draw.rect(self.screen, (255, 255, 255), pygame.Rect(0, 0, SCREEN_WIDTH, BUTTON_HEIGHT))
+		for button in self.buttons:
+			button.draw()
+
 		self.tick += 1
 		if self.tick == FRAME_RATE:
 			self.tick = 0
@@ -79,10 +83,7 @@ class Game():
 			self.map.hero.draw(self.screen_show)
 		self.enemy_group.process(time_passed)
 		self.enemy_group.render(self.screen, self.screen_show)
-		
-		pygame.draw.rect(self.screen, (255, 255, 255), pygame.Rect(0, 0, SCREEN_WIDTH, BUTTON_HEIGHT))
-		for button in self.buttons:
-			button.draw()
+
 			
 	def generateMaze(self):
 		if self.mode >= 9:
