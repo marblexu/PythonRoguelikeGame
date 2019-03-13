@@ -49,7 +49,6 @@ class Map():
 		self.frog_map = [[0 for x in range(self.width)] for y in range(self.height)]
 		self.walls = [[(1, 1, 1, 1) for x in range(self.width)] for y in range(self.height)]
 		self.room_list = None
-		self.hero = None
 		
 	def createBlock(self, block_num):
 		for i in range(block_num):
@@ -210,29 +209,35 @@ class ScreenShow():
 	def screenToMapPos(self, screen_x, screen_y):
 		return (screen_x + self.offset_x, screen_y + self.offset_y)
 	
-	def screenToMapIndex(self, screen_x, screen_y):
-		map_x, map_y = self.screenToMapPos(screen_x, screen_y)
+	def mapToMapIndex(self, map_x, map_y):
 		return self.map.MapPosToIndex(map_x, map_y)
 
 	def mapToScreenPos(self, map_x, map_y):		
 		return (map_x - self.offset_x, map_y - self.offset_y)
 	
+	def mapToLocationPos(self, map_x, map_y):
+		return (map_x - self.offset_x + self.start_x, map_y - self.offset_y + self.start_y)
+		
 	def getDrawLoaction(self, screen_x, screen_y):
 		return (screen_x + self.start_x, screen_y + self.start_y)
 	
+	def isInScreen(self, map_x, map_y, entity_width, entity_height):
+		screen_x, screen_y = self.mapToScreenPos(map_x, map_y)
+		if (screen_x > -entity_width and screen_x < self.width and 
+			screen_y > -entity_height and screen_y < self.height):
+			return True
+		return False
+		
 	# update screen offset after hero move
 	def updateOffset(self, hero, action):
-		map_x, map_y = self.screenToMapPos(hero.screen_x, hero.screen_y)
+		map_x, map_y = (hero.map_x, hero.map_y)
 		#print("map(%d, %d), screen(%d, %d) width(%d) screen_width(%d)" % (map_x, map_y, hero.screen_x, hero.screen_y, self.width, self.map.screen_width))
 		if map_x > self.width//2 and map_x < self.map.screen_width - self.width//2:
 			self.offset_x += action[0]
-			hero.screen_x -= action[0]
 		if map_y > self.height//2 and map_y < self.map.screen_height - self.height//2:
 			self.offset_y += action[1]
-			hero.screen_y -= action[1]
 		
-	def checkMovable(self, screen_x, screen_y, entity_width, entity_height):
-		map_x, map_y = self.screenToMapPos(screen_x, screen_y)
+	def checkMovable(self, map_x, map_y, entity_width, entity_height):
 		if (self.map.isInMap(map_x, map_y, entity_width, entity_height) and
 			self.map.isMovableInMap(map_x, map_y, entity_width, entity_height)):
 			return True
@@ -251,11 +256,11 @@ class ScreenShow():
 		small_height = height // reduce_ratio
 		return (small_location_x, small_location_y, small_width, small_height)		
 	
-	def screenToSmallMapRect(self, screen_x, screen_y, width, height):
-		map_x, map_y = self.screenToMapPos(screen_x, screen_y)
+	def mapToSmallMapRect(self, map_x, map_y, width, height):
 		return self.getSmallMapRect(map_x, map_y, width, height, MAP_REDUCE_RATIO)
 
-	def getScreenRect(self, screen_x, screen_y, width, height):
+	def mapToScreenRect(self, map_x, map_y, width, height):
+		screen_x, screen_y = self.mapToScreenPos(map_x, map_y)
 		if screen_x < 0:
 			image_width = width + screen_x
 			image_offset_x = -screen_x

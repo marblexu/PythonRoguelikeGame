@@ -70,17 +70,22 @@ class Game():
 		if self.tick == FRAME_RATE:
 			self.tick = 0
 			
-		if self.map.hero is not None:
-			if action is not None and self.tick % HERO_SPEED == 0:
-				if self.map.hero.move(action, self.screen_show):
-					self.screen_show.updateOffset(self.map.hero, action)
-					x, y = self.screen_show.screenToMapIndex(self.map.hero.screen_x, self.map.hero.screen_y)
+		if self.hero is not None:
+			if self.hero.shouldShoot():
+				self.hero.shootWeapon(self.screen_show)
+			elif action is not None and self.tick % HERO_SPEED == 0:
+				if self.hero.move(action, self.screen_show):
+					self.screen_show.updateOffset(self.hero, action)
+					x, y = self.screen_show.mapToMapIndex(self.hero.map_x, self.hero.map_y)
 					self.map.clearFrog(x, y, 5)
 				
 		self.screen_show.drawBackground(self.screen)
 		
-		if self.map.hero is not None:
-			self.map.hero.draw(self.screen_show)
+		if self.hero is not None:
+			for weapon_group in self.hero.weapon_groups:
+				weapon_group.update()
+				weapon_group.draw(self.screen)
+			self.hero.draw(self.screen_show)
 		self.enemy_group.process(time_passed)
 		self.enemy_group.render(self.screen, self.screen_show)
 
@@ -109,7 +114,8 @@ class Game():
 			self.source = self.map.generateEntityPos((1,self.map.width//5),(1, self.map.height//5))
 			screen_x, screen_y = self.screen_show.mapIndexToScreen(self.source[0], self.source[1])
 			hero_surface = initHeroSurface()
-			self.map.hero = Hero(self.screen, self.source[0], self.source[1], screen_x, screen_y, hero_surface)
+			weapon_groups = initWeaponGroups()
+			self.hero = Hero(self.screen, self.source[0], self.source[1], screen_x, screen_y, weapon_groups, hero_surface)
 			print("hero(%d,%d)" % (self.source[0], self.source[1]))
 			self.dest = self.map.generateEntityPos((self.map.width*4//5, self.map.width-2), (1, self.map.height-2))
 			self.map.clearFrog(self.source[0], self.source[1], 5)
@@ -118,14 +124,14 @@ class Game():
 			
 			self.map.setMap(self.dest[0], self.dest[1], MAP_ENTRY_TYPE.MAP_TARGET)
 		elif self.mode == 7:	
-			createEnemy(self.map, self.enemy_group)
+			createEnemy(self.map, self.enemy_group, self.hero)
 		#	AStarSearch(self.map, self.source, self.dest)
 		#	self.map.setMap(self.source[0], self.source[1], MAP_ENTRY_TYPE.MAP_TARGET)
 		#	self.map.setMap(self.dest[0], self.dest[1], MAP_ENTRY_TYPE.MAP_TARGET)
 		else:
 			self.map.resetMap(MAP_ENTRY_TYPE.MAP_EMPTY)
 			self.map.resetFrog(0)
-			self.map.hero = None
+			self.hero = None
 		self.mode += 1
 
 def check_buttons(game, mouse_x, mouse_y):
@@ -144,6 +150,7 @@ offset = {pygame.K_LEFT:(-1, 0, MOVE_DIRECTION.MOVE_LEFT),
 
 game = Game()
 action = None
+
 while True:
 	game.play()
 	pygame.display.update()
@@ -158,6 +165,9 @@ while True:
 			elif event.key == pygame.K_SPACE:
 				game.generateMaze()
 				break
+			elif event.key == pygame.K_x:
+				if game.hero is not None:
+					game.hero.setShoot()
 		elif event.type == pygame.KEYUP:
 			if event.key in offset:
 				action = None

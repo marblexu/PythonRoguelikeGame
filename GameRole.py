@@ -49,6 +49,48 @@ class StateMachine(object):
 		self.active_state = self.states[new_state_type]
 		self.active_state.enter_actions()
 
+class Weapon(pygame.sprite.Sprite):
+	def __init__(self, screen_show, weapon_surface, weapon_init_pos, direction):
+		pygame.sprite.Sprite.__init__(self)
+		self.screen_show = screen_show
+		self.image = weapon_surface
+		self.rect = self.image.get_rect()
+		self.map_x = weapon_init_pos[0]
+		self.map_y = weapon_init_pos[1]
+		self.rect.x, self.rect.y = self.screen_show.mapToLocationPos(self.map_x, self.map_y)
+		self.direction = direction
+
+	def update(self):
+		#direction[0]:x , direction[1]:y
+		if self.direction[0] == 0:
+			self.map_y += self.direction[1]
+		else:
+			self.map_x += self.direction[0]
+				
+		if not self.screen_show.isInScreen(self.map_x, self.map_y, self.rect.width, self.rect.height):
+			self.kill()
+		else:
+			self.rect.x, self.rect.y = self.screen_show.mapToLocationPos(self.map_x, self.map_y)
+		
+class WeaponGroup():
+	def __init__(self, weapon_surface, weapon_sound, damage):
+		self.surface = weapon_surface
+		self.group = pygame.sprite.Group()
+		self.weapon_sound = weapon_sound
+		self.damage = damage
+		
+	def shootWeapon(self, screen_show, position, direction):
+		weapon = Weapon(screen_show, self.surface, position, direction)
+		self.group.add(weapon)
+		self.weapon_sound.play()
+
+	def update(self):
+		self.group.update()
+	
+	def draw(self, screen):
+		self.group.draw(screen)
+
+
 class EnemyEntity(object):
 	def __init__(self, enemy_group, name, enemy_surface):
 		self.enemy_group = enemy_group
@@ -63,26 +105,21 @@ class EnemyEntity(object):
 		self.entity_surface = EntitySurface(enemy_surface, 15)
 		self.image = self.entity_surface.updateImage()
 		self.rect = self.image.get_rect()
-		self.width = self.rect.width
-		self.height = self.rect.height
 		self.moving = False
 		self.x = 0 # map index
 		self.y = 0 # map index
 		
 	def render(self, screen, screen_show):
-		if not screen_show.map.isFrog(self.x, self.y):
-			screen_x, screen_y = screen_show.mapToScreenPos(self.location[0], self.location[1])
-			if (screen_x > -self.rect.width and screen_x < screen_show.width and 
-				screen_y > -self.rect.height and screen_y < screen_show.height):
-				screen_x, screen_y, image_offset_x, image_offset_y, width, height = screen_show.getScreenRect(screen_x, screen_y, self.rect.width, self.rect.height)
-				location_x, location_y = screen_show.getDrawLoaction(screen_x, screen_y)
-				self.image = self.entity_surface.updateImage()
-				screen.blit(self.image, (location_x, location_y), (image_offset_x, image_offset_y, width, height))
+		if not screen_show.map.isFrog(self.x, self.y) and screen_show.isInScreen(self.location[0], self.location[1], self.rect.width, self.rect.height):
+			screen_x, screen_y, image_offset_x, image_offset_y, width, height = screen_show.mapToScreenRect(self.location[0], self.location[1], self.rect.width, self.rect.height)
+			location_x, location_y = screen_show.getDrawLoaction(screen_x, screen_y)
+			self.image = self.entity_surface.updateImage()
+			screen.blit(self.image, (location_x, location_y), (image_offset_x, image_offset_y, width, height))
 				
-				# draw hero in small map
-				color = (0, 255, 0)
-				small_location_x, small_location_y, small_width, small_height = screen_show.screenToSmallMapRect(screen_x, screen_y, self.rect.width, self.rect.height)
-				pygame.draw.rect(screen, color, pygame.Rect(small_location_x, small_location_y, small_width, small_height))
+			# draw hero in small map
+			color = (0, 255, 0)
+			small_location_x, small_location_y, small_width, small_height = screen_show.mapToSmallMapRect(self.location[0], self.location[1], self.rect.width, self.rect.height)
+			pygame.draw.rect(screen, color, pygame.Rect(small_location_x, small_location_y, small_width, small_height))
 	
 	def process(self, time_passed):
 		self.brain.think()
@@ -120,8 +157,9 @@ class EnemyEntity(object):
 			self.time_passed = 0
 
 class Enemy(EnemyEntity):
-	def __init__(self, enemy_group, enemy_surface, map, room):
+	def __init__(self, enemy_group, enemy_surface, map, room, hero):
 		EnemyEntity.__init__(self, enemy_group, "enemy", enemy_surface)
+		self.hero = hero
 		idle_state = EnemyStateIdle(self, map, room)
 		attack_state = EnemyStateAttack(self, map, room)
 		back_state = EnemyStateBack(self, map, room)
@@ -144,9 +182,9 @@ class EnemyStateIdle(State):
 		self.enemy.destination = self.enemy.location
 	
 	def check_conditions(self):
-		if self.map.hero is not None:
-			if (self.map.hero.x >= self.room.x and self.map.hero.x < self.room.x + self.room.width and
-				self.map.hero.y >= self.room.y and self.map.hero.y < self.room.y + self.room.height):
+		if self.enemy.hero is not None:
+			if (self.enemy.hero.x >= self.room.x and self.enemy.hero.x < self.room.x + self.room.width and
+				self.enemy.hero.y >= self.room.y and self.enemy.hero.y < self.room.y + self.room.height):
 				print("enemy(%d,%d) start to attack" % (self.enemy.location[0], self.enemy.location[1]))
 				return ENEMY_STATE_TYPE.ENEMY_ATTACK	
 		
@@ -176,9 +214,9 @@ class EnemyStateAttack(State):
 		self.distance = 0
 		
 	def do_actions(self):
-		if self.map.hero is not None:
-			if not self.enemy.moving and (self.enemy.x != self.map.hero.x or self.enemy.y != self.map.hero.y):
-				location = AStarSearch(self.map, (self.enemy.x, self.enemy.y), (self.map.hero.x, self.map.hero.y))
+		if self.enemy.hero is not None:
+			if not self.enemy.moving and (self.enemy.x != self.enemy.hero.x or self.enemy.y != self.enemy.hero.y):
+				location = AStarSearch(self.map, (self.enemy.x, self.enemy.y), (self.enemy.hero.x, self.enemy.hero.y))
 				if location is not None:
 					x, y, distance = getFirstStepAndDistance(location)
 					print("enemy(%d,%d) move to (%d,%d) distance %d" % (self.enemy.x, self.enemy.y, x, y, distance))
@@ -227,7 +265,7 @@ class EnemyStateBack(State):
 					if direction is not None:
 						self.enemy.entity_surface.updateDirection(direction)
 				
-				location = AStarSearch(self.map, (self.enemy.x, self.enemy.y), (self.map.hero.x, self.map.hero.y))
+				location = AStarSearch(self.map, (self.enemy.x, self.enemy.y), (self.enemy.hero.x, self.enemy.hero.y))
 				if location is not None:
 					hero_x, hero_y, distance = getFirstStepAndDistance(location)				
 					self.distance = distance
@@ -295,6 +333,7 @@ class EntitySurface():
 
 	def updateDirection(self, direction):
 		if self.surface[direction.value] != self.image_direct:
+			self.direction = direction
 			self.image_direct = self.surface[direction.value]
 			self.image_index = 0
 		self.moving = True
@@ -312,9 +351,13 @@ class EntitySurface():
 		else:
 			self.image = self.image_direct[0]
 		return self.image
-		
+	
+	def getDirection(self):
+		return self.direction
+
+
 class Hero():
-	def __init__(self, screen, init_x, init_y, screen_x, screen_y, hero_surface=None):
+	def __init__(self, screen, init_x, init_y, map_x, map_y, weapon_groups, hero_surface=None):
 		if hero_surface is not None:
 			self.entity_surface = EntitySurface(hero_surface, 15)
 			self.image = self.entity_surface.updateImage()
@@ -328,32 +371,61 @@ class Hero():
 		self.screen = screen
 		self.x = init_x
 		self.y = init_y
-		self.screen_x = screen_x
-		self.screen_y = screen_y		
+		self.map_x = map_x
+		self.map_y = map_y
+		self.weapon_groups = weapon_groups
+		self.weapon_index = 0
+		self.shoot = False
 	
+	def setShoot(self):
+		self.shoot = True
+	
+	def shouldShoot(self):
+		return self.shoot
+
+	def shootWeapon(self, screen_show):
+		def getWeaponPosition(self, direction, weapon_width, weapon_height):
+			if direction == MOVE_DIRECTION.MOVE_LEFT:
+				return (self.map_x, self.map_y + self.height//2 - weapon_height//2)
+			elif direction == MOVE_DIRECTION.MOVE_UP:
+				return (self.map_x + self.width//2 - weapon_width//2, self.map_y)
+			elif direction == MOVE_DIRECTION.MOVE_RIGHT:
+				return (self.map_x + self.width, self.map_y + self.height//2 - weapon_height//2)
+			else:
+				return (self.map_x + self.width//2 - weapon_width//2, self.map_y + self.height)
+				
+		if self.entity_surface is not None:
+			direction = self.entity_surface.getDirection()
+			rect = self.weapon_groups[self.weapon_index].surface.get_rect()
+			position =  getWeaponPosition(self, direction, rect.width, rect.height)
+			weapon_index = 0
+			weapon_direction = [(-1, 0),(0, -1), (1, 0), (0, 1)]
+			self.weapon_groups[self.weapon_index].shootWeapon(screen_show, position, weapon_direction[direction.value])
+			self.shoot = False
+
 	def move(self, action, screen_show):
-		screen_x = self.screen_x + action[0]
-		screen_y = self.screen_y + action[1]
+		map_x = self.map_x + action[0]
+		map_y = self.map_y + action[1]
 		
 		if self.entity_surface is not None:
 			self.entity_surface.updateDirection(action[2])
 		
-		if screen_show.checkMovable(screen_x, screen_y, self.width, self.height):
-			self.screen_x = screen_x
-			self.screen_y = screen_y
-			self.x, self.y = screen_show.screenToMapIndex(screen_x, screen_y)
+		if screen_show.checkMovable(map_x, map_y, self.width, self.height):
+			self.map_x = map_x
+			self.map_y = map_y
+			self.x, self.y = screen_show.mapToMapIndex(map_x, map_y)
 			return True
 		return False
 	
 	def draw(self, screen_show):
 		color = (0, 0, 255)
-		location_x, location_y = screen_show.getDrawLoaction(self.screen_x, self.screen_y)
+		location_x, location_y = screen_show.mapToLocationPos(self.map_x, self.map_y)
 		if self.entity_surface is not None:
 			self.image = self.entity_surface.updateImage()		
 			self.screen.blit(self.image, (location_x, location_y, self.rect.width, self.rect.height))
 			
 			# draw hero in small map
-			small_location_x, small_location_y, small_width, small_height = screen_show.screenToSmallMapRect(self.screen_x, self.screen_y, self.rect.height, self.rect.height)
+			small_location_x, small_location_y, small_width, small_height = screen_show.mapToSmallMapRect(self.map_x, self.map_y, self.rect.height, self.rect.height)
 			pygame.draw.rect(self.screen, color, pygame.Rect(small_location_x, small_location_y, small_width, small_height))
 		else:
 			pygame.draw.rect(self.screen, color, pygame.Rect(location_x, location_y, ENTITY_SIZE, ENTITY_SIZE))
@@ -426,13 +498,24 @@ def initEnemySurface():
 	enemy_surface.append(enemy_surface_down)
 	
 	return enemy_surface
+
+def initWeaponGroups():
+	weapon_img =  pygame.image.load('resource/image/weapon1.png')
+	weapon_groups = []
+	weapon1_surface = weapon_img.subsurface(pygame.Rect(0, 0, 14, 14))
+	weapon_sound = pygame.mixer.Sound('resource/sound/weapon1.wav')
+	weapon_sound.set_volume(0.3)
+	weapon_groups.append(WeaponGroup(weapon1_surface, weapon_sound, 1))
 	
-def createEnemy(map, enemy_group):
+	return weapon_groups
+
+	
+def createEnemy(map, enemy_group, hero):
 	if map.room_list is not None:
 		enemy1_surface = initEnemySurface()
 		print(map.room_list)
 		for room in map.room_list:
-			enemy = Enemy(enemy_group, enemy1_surface, map, room)
+			enemy = Enemy(enemy_group, enemy1_surface, map, room, hero)
 			enemy.x = randint(room.x, room.x + room.width - 1)
 			enemy.y = randint(room.y, room.y + room.height - 1)
 			enemy.location = map.indexToMapPos(enemy.x, enemy.y)
