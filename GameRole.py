@@ -67,7 +67,7 @@ class Weapon(pygame.sprite.Sprite):
 		else:
 			self.map_x += self.direction[0]
 				
-		if not self.screen_show.isInScreen(self.map_x, self.map_y, self.rect.width, self.rect.height):
+		if not self.screen_show.checkMovable(self.map_x, self.map_y, self.rect.width, self.rect.height):
 			self.kill()
 		else:
 			self.rect.x, self.rect.y = self.screen_show.mapToLocationPos(self.map_x, self.map_y)
@@ -91,16 +91,26 @@ class WeaponGroup():
 		self.group.draw(screen)
 
 
-class EnemyEntity(object):
-	def __init__(self, enemy_group, name, enemy_surface):
+class Enemy(pygame.sprite.Sprite):
+	def __init__(self, enemy_group, enemy_surface, screen_show, map, room, hero):
+		pygame.sprite.Sprite.__init__(self)
 		self.enemy_group = enemy_group
-		self.name = name
+		self.screen_show = screen_show
 		self.location = (0, 0) # map position
 		self.destination = (0, 0) # map position
 		self.speed = 0
 		self.brain = StateMachine()
 		self.id = 0
 		self.time_passed = 0.0
+		
+		self.hero = hero
+		idle_state = EnemyStateIdle(self, map, room)
+		attack_state = EnemyStateAttack(self, map, room)
+		back_state = EnemyStateBack(self, map, room)
+		self.brain.add_state(idle_state)
+		self.brain.add_state(attack_state)
+		self.brain.add_state(back_state)
+		
 		# init move image
 		self.entity_surface = EntitySurface(enemy_surface, 15)
 		self.image = self.entity_surface.updateImage()
@@ -108,7 +118,11 @@ class EnemyEntity(object):
 		self.moving = False
 		self.x = 0 # map index
 		self.y = 0 # map index
-		
+	
+	# used for sprite collide check
+	def update(self):
+		self.rect.x, self.rect.y = self.screen_show.mapToLocationPos(self.location[0], self.location[1])
+
 	def render(self, screen, screen_show):
 		if not screen_show.map.isFrog(self.x, self.y) and screen_show.isInScreen(self.location[0], self.location[1], self.rect.width, self.rect.height):
 			screen_x, screen_y, image_offset_x, image_offset_y, width, height = screen_show.mapToScreenRect(self.location[0], self.location[1], self.rect.width, self.rect.height)
@@ -152,23 +166,10 @@ class EnemyEntity(object):
 						self.y += 1
 
 				self.location = (map_x, map_y)
+				self.update()
 		else:
 			self.moving = False
-			self.time_passed = 0
-
-class Enemy(EnemyEntity):
-	def __init__(self, enemy_group, enemy_surface, map, room, hero):
-		EnemyEntity.__init__(self, enemy_group, "enemy", enemy_surface)
-		self.hero = hero
-		idle_state = EnemyStateIdle(self, map, room)
-		attack_state = EnemyStateAttack(self, map, room)
-		back_state = EnemyStateBack(self, map, room)
-		self.brain.add_state(idle_state)
-		self.brain.add_state(attack_state)
-		self.brain.add_state(back_state)
-	
-	def render(self, surface, screen_show):
-		EnemyEntity.render(self, surface, screen_show)			
+			self.time_passed = 0		
 
 		
 class EnemyStateIdle(State):
@@ -291,33 +292,23 @@ class EnemyStateBack(State):
 
 class EnemyGroup(object):
 	def __init__(self):
-		self.entities = {}
-		self.entity_id = 0
-	
+		self.group = pygame.sprite.Group()
+		
 	def add_entity(self, entity):
-		self.entities[self.entity_id] = entity
-		entity.id = self.entity_id
-		self.entity_id += 1
-	
-	def remove_entity(self, entity):
-		del self.entites[entity.id]
-	
-	def get(self, entity_id):
-		if entity_id in self.entities:
-			return self.entities[entity_id]
-		else:
-			return None
+		self.group.add(entity)
 	
 	def process(self, time_passed):
 		time_passed_seconds = time_passed / 1000.0
-		for entity in self.entities.values():
+		for entity in self.group:
 			entity.process(time_passed_seconds)
 
 	def render(self, surface, screen_show):
-		for entity in self.entities.values():
+		for entity in self.group:
 			entity.render(surface, screen_show)
 			
-
+	def update(self):
+		self.group.update()
+		
 class EntitySurface():
 	#surface must have four directions
 	def __init__(self, surface, animate_rate):
@@ -510,12 +501,12 @@ def initWeaponGroups():
 	return weapon_groups
 
 	
-def createEnemy(map, enemy_group, hero):
+def createEnemy(screen_show, map, enemy_group, hero):
 	if map.room_list is not None:
 		enemy1_surface = initEnemySurface()
 		print(map.room_list)
 		for room in map.room_list:
-			enemy = Enemy(enemy_group, enemy1_surface, map, room, hero)
+			enemy = Enemy(enemy_group, enemy1_surface, screen_show, map, room, hero)
 			enemy.x = randint(room.x, room.x + room.width - 1)
 			enemy.y = randint(room.y, room.y + room.height - 1)
 			enemy.location = map.indexToMapPos(enemy.x, enemy.y)

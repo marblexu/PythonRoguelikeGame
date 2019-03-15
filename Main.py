@@ -59,7 +59,14 @@ class Game():
 		self.hero = None
 		self.tick = 0
 		
-	def play(self):			
+	def play(self):
+		def checkBulletCollide(enemy_group, bullets_group):
+			score = 0
+			#for group in enemy_group:
+			#	for bullet_group in bullets_group:
+			#		score += group.checkBulletCollide(bullet_group) 
+			return score
+
 		time_passed = self.clock.tick(FRAME_RATE)		
 
 		pygame.draw.rect(self.screen, (255, 255, 255), pygame.Rect(0, 0, SCREEN_WIDTH, BUTTON_HEIGHT))
@@ -78,7 +85,8 @@ class Game():
 					self.screen_show.updateOffset(self.hero, action)
 					x, y = self.screen_show.mapToMapIndex(self.hero.map_x, self.hero.map_y)
 					self.map.clearFrog(x, y, 5)
-				
+			checkBulletCollide(self.enemy_group, self.hero.weapon_groups)
+			
 		self.screen_show.drawBackground(self.screen)
 		
 		if self.hero is not None:
@@ -124,7 +132,7 @@ class Game():
 			
 			self.map.setMap(self.dest[0], self.dest[1], MAP_ENTRY_TYPE.MAP_TARGET)
 		elif self.mode == 7:	
-			createEnemy(self.map, self.enemy_group, self.hero)
+			createEnemy(self.screen_show, self.map, self.enemy_group, self.hero)
 		#	AStarSearch(self.map, self.source, self.dest)
 		#	self.map.setMap(self.source[0], self.source[1], MAP_ENTRY_TYPE.MAP_TARGET)
 		#	self.map.setMap(self.dest[0], self.dest[1], MAP_ENTRY_TYPE.MAP_TARGET)
