@@ -3,14 +3,22 @@ from pygame.locals import *
 from sys import exit
 from random import randint
 from GameMap import *
-from MazeGenerator import *
 from AStarSearch import *
 from RogueLikeMaze import *
 from GameRole import *
+from enum import Enum
 
 FRAME_RATE = 60
 HERO_SPEED = 1
-		
+
+class BUTTON_TYPE(Enum):
+	BUTTON_PLAY = 0,
+	BUTTON_FROG = 1,
+	BUTTON_REST = 2,
+
+button_types = {BUTTON_TYPE.BUTTON_PLAY:"Play", 
+				BUTTON_TYPE.BUTTON_FROG:"Frog",
+				BUTTON_TYPE.BUTTON_REST:"Reset",}		
 class Button():
 	def __init__(self, screen, type, x, y):
 		self.screen = screen
@@ -23,10 +31,11 @@ class Button():
 		self.rect = pygame.Rect(0, 0, self.width, self.height)
 		self.rect.topleft = (x, y)
 		self.type = type
+		self.click = False
 		self.init_msg()
 		
 	def init_msg(self):
-		self.msg_image = self.font.render(generator_types[self.type], True, self.text_color[0], self.button_color)
+		self.msg_image = self.font.render(button_types[self.type], True, self.text_color[0], self.button_color)
 		self.msg_image_rect = self.msg_image.get_rect()
 		self.msg_image_rect.center = self.rect.center
 		
@@ -35,11 +44,16 @@ class Button():
 		self.screen.blit(self.msg_image, self.msg_image_rect)
 	
 	def click(self, game):
-		game.maze_type = self.type
-		self.msg_image = self.font.render(generator_types[self.type], True, self.text_color[1], self.button_color)
-	
-	def unclick(self):
-		self.msg_image = self.font.render(generator_types[self.type], True, self.text_color[0], self.button_color)
+		self.click = not self.click
+		if self.type == BUTTON_TYPE.BUTTON_PLAY:
+			pass
+		elif self.type == BUTTON_TYPE.BUTTON_FROG:
+			game.hasFrog = self.click
+		if self.click:
+			index = 1
+		else:
+			index = 0
+		self.msg_image = self.font.render(button_types[self.type], True, self.text_color[index], self.button_color)
 
 class Game():
 	def __init__(self):
@@ -48,24 +62,21 @@ class Game():
 		self.clock = pygame.time.Clock()
 		self.map = Map(REC_X_NUM, REC_Y_NUM)
 		self.screen_show = ScreenShow(SCREEN_WIDTH, SCREEN_HEIGHT, 0, BUTTON_HEIGHT, self.map)
-		self.enemy_group = EnemyGroup()
+		self.enemy_groups = []
 		self.mode = 0
 		self.buttons = []
-		self.buttons.append(Button(self.screen, MAZE_GENERATOR_TYPE.RECURSIVE_BACKTRACKER, 0, 0))
-		self.buttons.append(Button(self.screen, MAZE_GENERATOR_TYPE.RANDOM_PRIM, BUTTON_WIDTH + 10, 0))
-		self.buttons.append(Button(self.screen, MAZE_GENERATOR_TYPE.RECURSIVE_DIVISION, (BUTTON_WIDTH + 10) * 2, 0))
-		self.buttons.append(Button(self.screen, MAZE_GENERATOR_TYPE.UNION_FIND_SET, (BUTTON_WIDTH + 10) * 3, 0))
-		self.buttons[0].click(self)
+		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_PLAY, 0, 0))
+		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_FROG, BUTTON_WIDTH + 10, 0))
+		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_REST, (BUTTON_WIDTH + 10) * 2, 0))
 		self.hero = None
 		self.tick = 0
-		
+		self.hasFrog = False
+
 	def play(self):
-		def checkBulletCollide(enemy_group, bullets_group):
-			score = 0
-			#for group in enemy_group:
-			#	for bullet_group in bullets_group:
-			#		score += group.checkBulletCollide(bullet_group) 
-			return score
+		def checkBulletCollide(enemy_groups, bullets_group):
+			for group in self.enemy_groups:
+				for bullet_group in bullets_group:
+					group.checkBulletCollide(bullet_group) 
 
 		time_passed = self.clock.tick(FRAME_RATE)		
 
@@ -85,7 +96,7 @@ class Game():
 					self.screen_show.updateOffset(self.hero, action)
 					x, y = self.screen_show.mapToMapIndex(self.hero.map_x, self.hero.map_y)
 					self.map.clearFrog(x, y, 5)
-			checkBulletCollide(self.enemy_group, self.hero.weapon_groups)
+			checkBulletCollide(self.enemy_groups, self.hero.weapon_groups)
 			
 		self.screen_show.drawBackground(self.screen)
 		
@@ -94,17 +105,24 @@ class Game():
 				weapon_group.update()
 				weapon_group.draw(self.screen)
 			self.hero.draw(self.screen_show)
-		self.enemy_group.process(time_passed)
-		self.enemy_group.render(self.screen, self.screen_show)
+		
+		for group in self.enemy_groups:
+			group.process(time_passed, self.screen_show)
+			group.render(self.screen, self.screen_show)
 
-			
+	def resetGame(self):
+		self.map.resetMap(MAP_ENTRY_TYPE.MAP_EMPTY)
+		self.map.resetFrog(0)
+		self.hero = None
+		self.enemy_groups = []
+
 	def generateMaze(self):
 		if self.mode >= 9:
 			self.mode = 0
 		if self.mode == 0:
 			self.map.resetMap(MAP_ENTRY_TYPE.MAP_BLOCK)
 			room_max_size = self.map.width//10 if self.map.width < self.map.height else self.map.height//10
-			ROOM_NUM = room_max_size*20
+			ROOM_NUM = min(50, room_max_size*20)
 			addRooms(self.map, ROOM_NUM, room_max_size)
 			print(MOVE_DIRECTION.MOVE_RIGHT.value)
 		elif self.mode == 1:
@@ -117,7 +135,8 @@ class Game():
 		elif self.mode == 4:
 			removeDeadEnds(self.map, (self.map.width-1)//2, (self.map.height-1)//2)
 		elif self.mode == 5:
-			self.map.resetFrog(1)
+			if self.hasFrog:
+				self.map.resetFrog(1)
 		elif self.mode == 6:
 			self.source = self.map.generateEntityPos((1,self.map.width//5),(1, self.map.height//5))
 			screen_x, screen_y = self.screen_show.mapIndexToScreen(self.source[0], self.source[1])
@@ -132,23 +151,18 @@ class Game():
 			
 			self.map.setMap(self.dest[0], self.dest[1], MAP_ENTRY_TYPE.MAP_TARGET)
 		elif self.mode == 7:	
-			createEnemy(self.screen_show, self.map, self.enemy_group, self.hero)
+			createEnemy(self.screen_show, self.map, self.enemy_groups, self.hero)
 		#	AStarSearch(self.map, self.source, self.dest)
 		#	self.map.setMap(self.source[0], self.source[1], MAP_ENTRY_TYPE.MAP_TARGET)
 		#	self.map.setMap(self.dest[0], self.dest[1], MAP_ENTRY_TYPE.MAP_TARGET)
 		else:
-			self.map.resetMap(MAP_ENTRY_TYPE.MAP_EMPTY)
-			self.map.resetFrog(0)
-			self.hero = None
+			self.resetGame()
 		self.mode += 1
 
 def check_buttons(game, mouse_x, mouse_y):
 	for button in game.buttons:
 		if button.rect.collidepoint(mouse_x, mouse_y):
 			button.click(game)
-			for tmp in game.buttons:
-				if tmp != button:
-					tmp.unclick()
 			break
 
 offset = {pygame.K_LEFT:(-1, 0, MOVE_DIRECTION.MOVE_LEFT), 

@@ -91,28 +91,23 @@ class WeaponGroup():
 		self.group.draw(screen)
 
 
-class Enemy(pygame.sprite.Sprite):
-	def __init__(self, enemy_group, enemy_surface, screen_show, map, room, hero):
+class EnemyEntity(pygame.sprite.Sprite):
+	def __init__(self, enemy_group, name, enemy_surface):
 		pygame.sprite.Sprite.__init__(self)
 		self.enemy_group = enemy_group
-		self.screen_show = screen_show
+		self.name = name
 		self.location = (0, 0) # map position
 		self.destination = (0, 0) # map position
 		self.speed = 0
 		self.brain = StateMachine()
 		self.id = 0
 		self.time_passed = 0.0
-		
-		self.hero = hero
-		idle_state = EnemyStateIdle(self, map, room)
-		attack_state = EnemyStateAttack(self, map, room)
-		back_state = EnemyStateBack(self, map, room)
-		self.brain.add_state(idle_state)
-		self.brain.add_state(attack_state)
-		self.brain.add_state(back_state)
+		self.health = 5
+		self.hit = False
+		self.stun_ticks = 0
 		
 		# init move image
-		self.entity_surface = EntitySurface(enemy_surface, 15)
+		self.entity_surface = EntitySurface(enemy_surface, 15, self)
 		self.image = self.entity_surface.updateImage()
 		self.rect = self.image.get_rect()
 		self.moving = False
@@ -120,9 +115,17 @@ class Enemy(pygame.sprite.Sprite):
 		self.y = 0 # map index
 	
 	# used for sprite collide check
-	def update(self):
-		self.rect.x, self.rect.y = self.screen_show.mapToLocationPos(self.location[0], self.location[1])
+	def update(self, screen_show):
+		self.rect.x, self.rect.y = screen_show.mapToLocationPos(self.location[0], self.location[1])
+		if self.health <= 0:
+			self.kill()
 
+	def setHit(self, damage, stun_ticks):
+		self.health -= damage
+		self.hit = True
+		self.stun_ticks = stun_ticks
+		print("hit enemy(%d,%d) health(%d) damage(%d)" % (self.location[0], self.location[1], self.health, damage))
+		
 	def render(self, screen, screen_show):
 		if not screen_show.map.isFrog(self.x, self.y) and screen_show.isInScreen(self.location[0], self.location[1], self.rect.width, self.rect.height):
 			screen_x, screen_y, image_offset_x, image_offset_y, width, height = screen_show.mapToScreenRect(self.location[0], self.location[1], self.rect.width, self.rect.height)
@@ -135,9 +138,11 @@ class Enemy(pygame.sprite.Sprite):
 			small_location_x, small_location_y, small_width, small_height = screen_show.mapToSmallMapRect(self.location[0], self.location[1], self.rect.width, self.rect.height)
 			pygame.draw.rect(screen, color, pygame.Rect(small_location_x, small_location_y, small_width, small_height))
 	
-	def process(self, time_passed):
+	def process(self, time_passed, screen_show):
 		self.brain.think()
-		if self.location != self.destination:
+		if self.hit:
+			pass
+		elif self.location != self.destination:
 			self.time_passed += time_passed
 			direction = getMoveDirection(self.location[0], self.location[1], self.destination[0], self.destination[1])
 			if self.speed * self.time_passed > 1.0:				
@@ -166,11 +171,26 @@ class Enemy(pygame.sprite.Sprite):
 						self.y += 1
 
 				self.location = (map_x, map_y)
-				self.update()
 		else:
 			self.moving = False
 			self.time_passed = 0		
+		
+		self.update(screen_show)
 
+class Enemy(EnemyEntity):
+	def __init__(self, enemy_group, enemy_surface, map, room, hero):
+		EnemyEntity.__init__(self, enemy_group, "enemy", enemy_surface)
+		self.hero = hero
+		idle_state = EnemyStateIdle(self, map, room)
+		attack_state = EnemyStateAttack(self, map, room)
+		back_state = EnemyStateBack(self, map, room)
+		self.brain.add_state(idle_state)
+		self.brain.add_state(attack_state)
+		self.brain.add_state(back_state)
+
+	def render(self, surface, screen_show):
+		EnemyEntity.render(self, surface, screen_show)	
+	
 		
 class EnemyStateIdle(State):
 	def __init__(self, enemy, map, room):
@@ -293,25 +313,28 @@ class EnemyStateBack(State):
 class EnemyGroup(object):
 	def __init__(self):
 		self.group = pygame.sprite.Group()
-		
+
 	def add_entity(self, entity):
 		self.group.add(entity)
 	
-	def process(self, time_passed):
+	def process(self, time_passed, screen_show):
 		time_passed_seconds = time_passed / 1000.0
 		for entity in self.group:
-			entity.process(time_passed_seconds)
+			entity.process(time_passed_seconds, screen_show)
 
 	def render(self, surface, screen_show):
 		for entity in self.group:
 			entity.render(surface, screen_show)
 			
-	def update(self):
-		self.group.update()
-		
+	def checkBulletCollide(self, bullets):
+		hit_group = pygame.sprite.groupcollide(self.group, bullets.group, False, True)
+		for enemy in hit_group:
+			enemy.setHit(bullets.damage, 30)	
+
+
 class EntitySurface():
 	#surface must have four directions
-	def __init__(self, surface, animate_rate):
+	def __init__(self, surface, animate_rate, entity):
 		self.surface = surface
 		self.rate = animate_rate
 		self.direction = MOVE_DIRECTION.MOVE_RIGHT
@@ -321,6 +344,8 @@ class EntitySurface():
 		self.image = self.image_direct[self.image_index]
 		self.ticks = 0
 		self.moving = False
+		self.entity = entity
+		self.hit_image = None
 
 	def updateDirection(self, direction):
 		if self.surface[direction.value] != self.image_direct:
@@ -331,16 +356,30 @@ class EntitySurface():
 		
 	def updateImage(self):
 		self.ticks += 1
-		if self.ticks == self.rate:
-			self.ticks = 0
-			self.image_index += 1
-			if self.image_index == self.image_num:
+		if self.entity.hit:
+			if self.hit_image is None:
+				if self.direction == MOVE_DIRECTION.MOVE_LEFT:
+					self.hit_image = pygame.transform.rotate(self.image, -10)
+				else:
+					self.hit_image = pygame.transform.rotate(self.image, 10)
+			self.image = self.hit_image
+			self.entity.stun_ticks -= 1
+			if self.entity.stun_ticks <= 0:
+				self.entity.hit = False
+				self.hit_image = None
 				self.image_index = 0
-				self.moving = False
-		if self.moving:
-			self.image = self.image_direct[self.image_index]
+				self.ticks = 0
 		else:
-			self.image = self.image_direct[0]
+			if self.ticks == self.rate:
+				self.ticks = 0
+				self.image_index += 1
+				if self.image_index == self.image_num:
+					self.image_index = 0
+					self.moving = False
+			if self.moving:
+				self.image = self.image_direct[self.image_index]
+			else:
+				self.image = self.image_direct[0]
 		return self.image
 	
 	def getDirection(self):
@@ -350,7 +389,9 @@ class EntitySurface():
 class Hero():
 	def __init__(self, screen, init_x, init_y, map_x, map_y, weapon_groups, hero_surface=None):
 		if hero_surface is not None:
-			self.entity_surface = EntitySurface(hero_surface, 15)
+			self.hit = False
+			self.stun_ticks = 0
+			self.entity_surface = EntitySurface(hero_surface, 15, self)
 			self.image = self.entity_surface.updateImage()
 			self.rect = self.image.get_rect()
 			self.width = self.rect.width
@@ -367,7 +408,7 @@ class Hero():
 		self.weapon_groups = weapon_groups
 		self.weapon_index = 0
 		self.shoot = False
-	
+
 	def setShoot(self):
 		self.shoot = True
 	
@@ -501,17 +542,19 @@ def initWeaponGroups():
 	return weapon_groups
 
 	
-def createEnemy(screen_show, map, enemy_group, hero):
+def createEnemy(screen_show, map, enemy_groups, hero):
 	if map.room_list is not None:
+		enemy_group = EnemyGroup()
 		enemy1_surface = initEnemySurface()
 		print(map.room_list)
 		for room in map.room_list:
-			enemy = Enemy(enemy_group, enemy1_surface, screen_show, map, room, hero)
+			enemy = Enemy(enemy_group, enemy1_surface, map, room, hero)
 			enemy.x = randint(room.x, room.x + room.width - 1)
 			enemy.y = randint(room.y, room.y + room.height - 1)
 			enemy.location = map.indexToMapPos(enemy.x, enemy.y)
 			print("(%d,%d)" % (enemy.x,  enemy.y))
 			enemy.brain.set_state(ENEMY_STATE_TYPE.ENEMY_IDLE)
 			enemy_group.add_entity(enemy)
-			
+		
+		enemy_groups.append(enemy_group)
 			
