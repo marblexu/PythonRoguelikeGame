@@ -77,7 +77,11 @@ class Game():
 			for group in self.enemy_groups:
 				for bullet_group in bullets_group:
 					group.checkBulletCollide(bullet_group) 
-
+		
+		def checkHeroCollide(enemy_groups, hero):
+			for group in self.enemy_groups:
+				group.checkHeroCollide(hero)
+				
 		time_passed = self.clock.tick(FRAME_RATE)		
 
 		pygame.draw.rect(self.screen, (255, 255, 255), pygame.Rect(0, 0, SCREEN_WIDTH, BUTTON_HEIGHT))
@@ -97,6 +101,7 @@ class Game():
 					x, y = self.screen_show.mapToMapIndex(self.hero.map_x, self.hero.map_y)
 					self.map.clearFrog(x, y, 5)
 			checkBulletCollide(self.enemy_groups, self.hero.weapon_groups)
+			checkHeroCollide(self.enemy_groups, self.hero)				
 			
 		self.screen_show.drawBackground(self.screen)
 		
@@ -109,7 +114,12 @@ class Game():
 		for group in self.enemy_groups:
 			group.process(time_passed, self.screen_show)
 			group.render(self.screen, self.screen_show)
-
+	
+	def isOver(self):
+		if self.hero is not None:
+			return self.hero.isDead()
+		return False
+		
 	def resetGame(self):
 		self.map.resetMap(MAP_ENTRY_TYPE.MAP_EMPTY)
 		self.map.resetFrog(0)
@@ -143,6 +153,7 @@ class Game():
 			hero_surface = initHeroSurface()
 			weapon_groups = initWeaponGroups()
 			self.hero = Hero(self.screen, self.source[0], self.source[1], screen_x, screen_y, weapon_groups, hero_surface)
+			self.hero.update(self.screen_show)
 			print("hero(%d,%d)" % (self.source[0], self.source[1]))
 			self.dest = self.map.generateEntityPos((self.map.width*4//5, self.map.width-2), (1, self.map.height-2))
 			self.map.clearFrog(self.source[0], self.source[1], 5)
@@ -174,7 +185,11 @@ game = Game()
 action = None
 
 while True:
-	game.play()
+	if game.isOver():
+		print("Game over")
+		game.resetGame()
+	else:
+		game.play()
 	pygame.display.update()
 		
 	for event in pygame.event.get():
