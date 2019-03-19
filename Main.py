@@ -61,7 +61,7 @@ class Game():
 		self.screen = pygame.display.set_mode([SCREEN_WIDTH + MAPS_INTERVAL + SMALL_MAP_WIDTH + MAPS_INTERVAL, SCREEN_HEIGHT + BUTTON_HEIGHT])
 		self.clock = pygame.time.Clock()
 		self.map = Map(REC_X_NUM, REC_Y_NUM)
-		self.screen_show = ScreenShow(SCREEN_WIDTH, SCREEN_HEIGHT, 0, BUTTON_HEIGHT, self.map)
+		self.screen_show = ScreenShow(SCREEN_WIDTH, SCREEN_HEIGHT, 0, BUTTON_HEIGHT + HERO_INFO_HEIGHT, self.map)
 		self.enemy_groups = []
 		self.mode = 0
 		self.buttons = []
@@ -69,7 +69,6 @@ class Game():
 		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_FROG, BUTTON_WIDTH + 10, 0))
 		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_REST, (BUTTON_WIDTH + 10) * 2, 0))
 		self.hero = None
-		self.tick = 0
 		self.hasFrog = False
 
 	def play(self):
@@ -87,19 +86,9 @@ class Game():
 		pygame.draw.rect(self.screen, (255, 255, 255), pygame.Rect(0, 0, SCREEN_WIDTH, BUTTON_HEIGHT))
 		for button in self.buttons:
 			button.draw()
-
-		self.tick += 1
-		if self.tick == FRAME_RATE:
-			self.tick = 0
 			
 		if self.hero is not None:
-			if self.hero.shouldShoot():
-				self.hero.shootWeapon(self.screen_show)
-			elif action is not None and self.tick % HERO_SPEED == 0:
-				if self.hero.move(action, self.screen_show):
-					self.screen_show.updateOffset(self.hero, action)
-					x, y = self.screen_show.mapToMapIndex(self.hero.map_x, self.hero.map_y)
-					self.map.clearFrog(x, y, 5)
+			self.hero.play(self.screen_show, action, time_passed)
 			checkBulletCollide(self.enemy_groups, self.hero.weapon_groups)
 			checkHeroCollide(self.enemy_groups, self.hero)				
 			
@@ -110,7 +99,8 @@ class Game():
 				weapon_group.update()
 				weapon_group.draw(self.screen)
 			self.hero.draw(self.screen_show)
-		
+			self.screen_show.showHeroInfo(self.screen, self.hero)
+
 		for group in self.enemy_groups:
 			group.process(time_passed, self.screen_show)
 			group.render(self.screen, self.screen_show)

@@ -6,17 +6,19 @@ from pygame.locals import *
 REC_SIZE = 50
 WALL_SIZE = 20
 ENTITY_SIZE = 15
-REC_X_NUM = 69 # must be odd number
+REC_X_NUM = 49 # must be odd number
 REC_Y_NUM = 41 # must be odd number
 BUTTON_HEIGHT = 30
 BUTTON_WIDTH = 120
+HERO_INFO_HEIGHT = 30
+HERO_INFO_WIDTH = 500
 MAP_WIDTH = REC_X_NUM//2 * REC_SIZE + REC_X_NUM//2 * WALL_SIZE + WALL_SIZE
 MAP_HEIGHT = REC_Y_NUM//2 * REC_SIZE + REC_Y_NUM//2 * WALL_SIZE + WALL_SIZE
 MAP_REDUCE_RATIO = 10
 MAPS_INTERVAL = 10
 SMALL_MAP_WIDTH = MAP_WIDTH//MAP_REDUCE_RATIO
 SCREEN_WIDTH = min(900, MAP_WIDTH)
-SCREEN_HEIGHT = min(500, MAP_HEIGHT) + BUTTON_HEIGHT
+SCREEN_HEIGHT = min(500, MAP_HEIGHT)
 
 class MAP_ENTRY_TYPE(IntEnum):
 	MAP_EMPTY = 0,
@@ -327,3 +329,29 @@ class ScreenShow():
 					pygame.draw.rect(screen, color, pygame.Rect(location_x, location_y, width, height))
 
 				
+	def showHeroInfo(self, screen, hero):
+		def showFont(text, location_x, locaiton_y, height):
+			font = pygame.font.SysFont(None, height)
+			font_image = font.render(text, True, (0, 0, 255), (255, 255, 255))
+			font_image_rect = font_image.get_rect()
+			font_image_rect.x = location_x
+			font_image_rect.y = locaiton_y
+			screen.blit(font_image, font_image_rect)
+			
+		color = (255, 255, 255)
+		pygame.draw.rect(screen, color, pygame.Rect(0, BUTTON_HEIGHT, SCREEN_WIDTH, HERO_INFO_HEIGHT))
+		
+		showFont("Health", 5, BUTTON_HEIGHT + HERO_INFO_HEIGHT//6, HERO_INFO_HEIGHT*2//3)
+		
+		color = (255, 0, 0)
+		location_y = BUTTON_HEIGHT + HERO_INFO_HEIGHT//6
+		location_x = 50
+		height = HERO_INFO_HEIGHT*2//3
+		width = (HERO_INFO_WIDTH//3) * hero.getHealthRatio()
+		pygame.draw.rect(screen, color, pygame.Rect(location_x, location_y, width, height))
+		
+		showFont("Magic", HERO_INFO_WIDTH//2, BUTTON_HEIGHT + HERO_INFO_HEIGHT//6, HERO_INFO_HEIGHT*2//3)
+		color = (0, 0, 255)
+		width = (HERO_INFO_WIDTH//3) *  hero.getMagicRatio()
+		location_x = 50 + HERO_INFO_WIDTH//2
+		pygame.draw.rect(screen, color, pygame.Rect(location_x, location_y, width, height))

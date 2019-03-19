@@ -73,11 +73,12 @@ class Weapon(pygame.sprite.Sprite):
 			self.rect.x, self.rect.y = self.screen_show.mapToLocationPos(self.map_x, self.map_y)
 		
 class WeaponGroup():
-	def __init__(self, weapon_surface, weapon_sound, damage):
+	def __init__(self, weapon_surface, weapon_sound, damage, cost):
 		self.surface = weapon_surface
 		self.group = pygame.sprite.Group()
 		self.weapon_sound = weapon_sound
 		self.damage = damage
+		self.cost = cost
 		
 	def shootWeapon(self, screen_show, position, direction):
 		weapon = Weapon(screen_show, self.surface, position, direction)
@@ -199,7 +200,7 @@ class Enemy(EnemyEntity):
 		if not self.hit and self.attack_ticks == 0:
 			self.attack = True
 			self.attack_ticks = 60
-			self.entity_surface.setAttackTime(self.attack_ticks//2, self.attack_ticks//2)
+			self.entity_surface.setAttackTime(30, 30)
 			hero.setHit(self.damage)
 			print("enemy(%d,%d) hit hero damage(%d)" % (self.location[0], self.location[1], self.damage))
 			
@@ -348,7 +349,8 @@ class EnemyGroup(object):
 		enemy_hit_list = pygame.sprite.spritecollide(hero, self.group, False)
 		if len(enemy_hit_list) > 0:
 			for enemy in enemy_hit_list:
-				enemy.tryAttack(hero)			
+				if pygame.sprite.collide_circle_ratio(0.7)(enemy, hero):
+					enemy.tryAttack(hero)			
 					
 		
 class EntitySurface():
@@ -458,7 +460,11 @@ class Hero(pygame.sprite.Sprite):
 		self.weapon_index = 0
 		self.shoot = False
 		self.health = 100
-	
+		self.max_health = 100
+		self.magic = 100.0
+		self.max_magic = 100.0
+		self.magic_recover = 10 # magic recovery value every second
+
 	# used for sprite collide check
 	def update(self, screen_show):
 		self.rect.x, self.rect.y = screen_show.mapToLocationPos(self.map_x, self.map_y)
@@ -466,14 +472,28 @@ class Hero(pygame.sprite.Sprite):
 	def setShoot(self):
 		self.shoot = True
 	
-	def shouldShoot(self):
-		return self.shoot
-	
 	def setHit(self, damage):
 		self.health -= damage
 
 	def isDead(self):
 		return (self.health <= 0)
+	
+	def getHealthRatio(self):
+		if self.health > 0:
+			return self.health / self.max_health
+		else:
+			return 0
+	
+	def useMagic(self, cost):
+		self.magic -= cost
+	
+	def increaseMagic(self, time_passed):
+		time_passed_seconds = time_passed / 1000.0
+		num = self.magic_recover * time_passed_seconds
+		self.magic = min(self.magic + num, self.max_magic)
+
+	def getMagicRatio(self):
+		return self.magic / self.max_magic
 
 	def shootWeapon(self, screen_show):
 		def getWeaponPosition(self, direction, weapon_width, weapon_height):
@@ -487,12 +507,13 @@ class Hero(pygame.sprite.Sprite):
 				return (self.map_x + self.width//2 - weapon_width//2, self.map_y + self.height)
 				
 		if self.entity_surface is not None:
-			direction = self.entity_surface.getDirection()
-			rect = self.weapon_groups[self.weapon_index].surface.get_rect()
-			position =  getWeaponPosition(self, direction, rect.width, rect.height)
-			weapon_index = 0
-			weapon_direction = [(-1, 0),(0, -1), (1, 0), (0, 1)]
-			self.weapon_groups[self.weapon_index].shootWeapon(screen_show, position, weapon_direction[direction.value])
+			if self.magic >= self.weapon_groups[self.weapon_index].cost:
+				direction = self.entity_surface.getDirection()
+				rect = self.weapon_groups[self.weapon_index].surface.get_rect()
+				position =  getWeaponPosition(self, direction, rect.width, rect.height)
+				weapon_direction = [(-1, 0),(0, -1), (1, 0), (0, 1)]
+				self.weapon_groups[self.weapon_index].shootWeapon(screen_show, position, weapon_direction[direction.value])
+				self.useMagic(self.weapon_groups[self.weapon_index].cost)
 			self.shoot = False
 
 	def move(self, action, screen_show):
@@ -511,6 +532,16 @@ class Hero(pygame.sprite.Sprite):
 			return True
 		return False
 	
+	def play(self, screen_show, action, time_passed):
+		if self.shoot:
+			self.shootWeapon(screen_show)
+		elif action is not None:
+			if self.move(action, screen_show):
+				screen_show.updateOffset(self, action)
+				x, y = screen_show.mapToMapIndex(self.map_x, self.map_y)
+				screen_show.map.clearFrog(x, y, 5)
+		self.increaseMagic(time_passed)
+		
 	def draw(self, screen_show):
 		color = (0, 0, 255)
 		location_x, location_y = screen_show.mapToLocationPos(self.map_x, self.map_y)
@@ -599,7 +630,7 @@ def initWeaponGroups():
 	weapon1_surface = weapon_img.subsurface(pygame.Rect(0, 0, 14, 14))
 	weapon_sound = pygame.mixer.Sound('resource/sound/weapon1.wav')
 	weapon_sound.set_volume(0.3)
-	weapon_groups.append(WeaponGroup(weapon1_surface, weapon_sound, 1))
+	weapon_groups.append(WeaponGroup(weapon1_surface, weapon_sound, 1, 20))
 	
 	return weapon_groups
 
