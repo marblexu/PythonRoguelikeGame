@@ -10,15 +10,19 @@ REC_X_NUM = 49 # must be odd number
 REC_Y_NUM = 41 # must be odd number
 BUTTON_HEIGHT = 30
 BUTTON_WIDTH = 120
-HERO_INFO_HEIGHT = 30
-HERO_INFO_WIDTH = 500
+
+HERO_INFO_WIDTH = 200
+HERO_ITEM_HEIGHT = 30
 MAP_WIDTH = REC_X_NUM//2 * REC_SIZE + REC_X_NUM//2 * WALL_SIZE + WALL_SIZE
 MAP_HEIGHT = REC_Y_NUM//2 * REC_SIZE + REC_Y_NUM//2 * WALL_SIZE + WALL_SIZE
 MAP_REDUCE_RATIO = 10
 MAPS_INTERVAL = 10
 SMALL_MAP_WIDTH = MAP_WIDTH//MAP_REDUCE_RATIO
+SMALL_MAP_HEIGHT = MAP_HEIGHT//MAP_REDUCE_RATIO
+INFO_SHOW_WIDTH = max(SMALL_MAP_WIDTH + MAPS_INTERVAL + MAPS_INTERVAL, HERO_INFO_WIDTH)
 SCREEN_WIDTH = min(900, MAP_WIDTH)
 SCREEN_HEIGHT = min(500, MAP_HEIGHT)
+HERO_INFO_HEIGHT = SCREEN_HEIGHT + BUTTON_HEIGHT - SMALL_MAP_HEIGHT - MAPS_INTERVAL - MAPS_INTERVAL
 
 class MAP_ENTRY_TYPE(IntEnum):
 	MAP_EMPTY = 0,
@@ -252,8 +256,8 @@ class ScreenShow():
 	def getSmallMapRect(self, map_x, map_y, width, height, reduce_ratio):
 		small_map_x = map_x // reduce_ratio
 		small_map_y = map_y // reduce_ratio
-		small_location_x = small_map_x + self.width + MAPS_INTERVAL
-		small_location_y = small_map_y + BUTTON_HEIGHT
+		small_location_x = small_map_x + MAPS_INTERVAL
+		small_location_y = small_map_y + MAPS_INTERVAL
 		small_width = width // reduce_ratio
 		small_height = height // reduce_ratio
 		return (small_location_x, small_location_y, small_width, small_height)		
@@ -286,7 +290,10 @@ class ScreenShow():
 			image_offset_y = 0
 		return (screen_x, screen_y, image_offset_x, image_offset_y, image_width, image_height)
 
-	def drawBackground(self, screen):		
+	def drawBackground(self, screen):
+		#init small map area
+		color = (240, 240, 240)
+		pygame.draw.rect(screen, color, pygame.Rect(0, 0, INFO_SHOW_WIDTH, SMALL_MAP_HEIGHT + MAPS_INTERVAL + MAPS_INTERVAL))
 		for y in range(self.map.height):
 			for x in range(self.map.width):
 				if self.map.isFrog(x,y):
@@ -337,21 +344,25 @@ class ScreenShow():
 			font_image_rect.x = location_x
 			font_image_rect.y = locaiton_y
 			screen.blit(font_image, font_image_rect)
-			
-		color = (255, 255, 255)
-		pygame.draw.rect(screen, color, pygame.Rect(0, BUTTON_HEIGHT, SCREEN_WIDTH, HERO_INFO_HEIGHT))
 		
-		showFont("Health", 5, BUTTON_HEIGHT + HERO_INFO_HEIGHT//6, HERO_INFO_HEIGHT*2//3)
+		start_x = 0
+		start_y = SMALL_MAP_HEIGHT + MAPS_INTERVAL + MAPS_INTERVAL
+		color = (255, 255, 255)
+		pygame.draw.rect(screen, color, pygame.Rect(start_x, start_y, INFO_SHOW_WIDTH, HERO_INFO_HEIGHT))
+		
+		showFont("Health", 5, start_y + HERO_ITEM_HEIGHT//6, HERO_ITEM_HEIGHT*2//3)
 		
 		color = (255, 0, 0)
-		location_y = BUTTON_HEIGHT + HERO_INFO_HEIGHT//6
+		location_y = start_y + HERO_ITEM_HEIGHT//6
 		location_x = 50
-		height = HERO_INFO_HEIGHT*2//3
-		width = (HERO_INFO_WIDTH//3) * hero.getHealthRatio()
+		height = HERO_ITEM_HEIGHT*2//3
+		width = (INFO_SHOW_WIDTH//2) * hero.getHealthRatio()
 		pygame.draw.rect(screen, color, pygame.Rect(location_x, location_y, width, height))
 		
-		showFont("Magic", HERO_INFO_WIDTH//2, BUTTON_HEIGHT + HERO_INFO_HEIGHT//6, HERO_INFO_HEIGHT*2//3)
+		start_y += HERO_ITEM_HEIGHT
+		showFont("Magic", 5, start_y + HERO_ITEM_HEIGHT//6, HERO_ITEM_HEIGHT*2//3)
 		color = (0, 0, 255)
-		width = (HERO_INFO_WIDTH//3) *  hero.getMagicRatio()
-		location_x = 50 + HERO_INFO_WIDTH//2
+		location_y = start_y + HERO_ITEM_HEIGHT//6
+		width = (INFO_SHOW_WIDTH//2) *  hero.getMagicRatio()
 		pygame.draw.rect(screen, color, pygame.Rect(location_x, location_y, width, height))
+		

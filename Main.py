@@ -58,16 +58,16 @@ class Button():
 class Game():
 	def __init__(self):
 		pygame.init()
-		self.screen = pygame.display.set_mode([SCREEN_WIDTH + MAPS_INTERVAL + SMALL_MAP_WIDTH + MAPS_INTERVAL, SCREEN_HEIGHT + BUTTON_HEIGHT])
+		self.screen = pygame.display.set_mode([SCREEN_WIDTH + INFO_SHOW_WIDTH, SCREEN_HEIGHT + BUTTON_HEIGHT])
 		self.clock = pygame.time.Clock()
 		self.map = Map(REC_X_NUM, REC_Y_NUM)
-		self.screen_show = ScreenShow(SCREEN_WIDTH, SCREEN_HEIGHT, 0, BUTTON_HEIGHT + HERO_INFO_HEIGHT, self.map)
+		self.screen_show = ScreenShow(SCREEN_WIDTH, SCREEN_HEIGHT, INFO_SHOW_WIDTH, BUTTON_HEIGHT, self.map)
 		self.enemy_groups = []
 		self.mode = 0
 		self.buttons = []
-		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_PLAY, 0, 0))
-		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_FROG, BUTTON_WIDTH + 10, 0))
-		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_REST, (BUTTON_WIDTH + 10) * 2, 0))
+		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_PLAY, INFO_SHOW_WIDTH, 0))
+		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_FROG, INFO_SHOW_WIDTH + BUTTON_WIDTH + 10, 0))
+		self.buttons.append(Button(self.screen, BUTTON_TYPE.BUTTON_REST, INFO_SHOW_WIDTH + (BUTTON_WIDTH + 10) * 2, 0))
 		self.hero = None
 		self.hasFrog = False
 
