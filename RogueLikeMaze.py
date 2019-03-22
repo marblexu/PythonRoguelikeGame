@@ -36,16 +36,13 @@ def addRooms(map, room_num, max_size):
 		else:
 			height += rectangularity
 		
-		x = randint(1, (map.width - width)//2 - 1) * 2 + 1
-		y = randint(1, (map.height - height)//2 - 1) * 2 + 1
-		
-		if x == 0 and y == 0:
-			continue
+		x = randint(0, (map.width - width)//2 - 1) * 2 + 1
+		y = randint(0, (map.height - height)//2 - 1) * 2 + 1
 
 		room = Rect(x, y, width, height)
 		
 		for entry in rooms:
-			if room.isOverLap(entry, 2):
+			if room.isOverLap(entry, 0):
 				overlap = True
 				break;
 		
@@ -97,24 +94,26 @@ def checkAdjacentPos(map, x, y, width, height, checklist):
 	else:
 		# if not find any unvisited adjacent entry
 		return False
+
 		
 def growMaze(map, width, height):
-	# Use Random Prim algorithm
-	# always start in (0,0)
-	startX, startY = (0, 0)
-	print("start(%d, %d)" % (startX, startY))
-	map.setMap(2*startX+1, 2*startY+1, MAP_ENTRY_TYPE.MAP_EMPTY)
+	def _growMaze(start_x, start_y, width, height):
+		# Use Random Prim algorithm
+		checklist = []
+		checklist.append((start_x, start_y))
+		while len(checklist):
+			# select a random entry from checklist
+			entry = choice(checklist)	
+			if not checkAdjacentPos(map, entry[0], entry[1], width, height, checklist):
+				# the entry has no unvisited adjacent entry, so remove it from checklist
+				checklist.remove(entry)
+
+	for x in range(width):
+		for y in range(height):
+			if not map.isVisited(2*x+1, 2*y+1):
+				_growMaze(x, y, width, height)
+
 	
-	checklist = []
-	checklist.append((startX, startY))
-	while len(checklist):
-		# select a random entry from checklist
-		entry = choice(checklist)	
-		if not checkAdjacentPos(map, entry[0], entry[1], width, height, checklist):
-			# the entry has no unvisited adjacent entry, so remove it from checklist
-			checklist.remove(entry)
-
-
 def connectRegions(map, width, height):
 	# find the root of the tree which the node belongs to
 	def findSet(parent, index):
@@ -284,7 +283,50 @@ def addReduentConnect(map, width, height, factor):
 					addConnect(map, x, y, width, height)
 					num = 0
 
-					
+def connectReduentRooms(map, width, height, factor):
+	def hasDoor(map, start_x, range_x, start_y, range_y):
+		for offset_x in range(range_x):
+			for offset_y in range(range_y):
+				if map.isMovable(start_x + offset_x, start_y + offset_y):
+					return True
+		return False
+
+	def createDoor(map, room, width, height):
+		directions = []
+		if room.x > 1 and not hasDoor(map, room.x-1, 1, room.y, room.height):		
+			directions.append(WALL_DIRECTION.WALL_LEFT)	
+		if room.y > 1 and not hasDoor(map, room.x, room.width, room.y - 1, 1):
+			directions.append(WALL_DIRECTION.WALL_UP)
+		if room.x + room.width + 1 < width and not hasDoor(map, room.x + room.width, 1, room.y, room.height):
+			directions.append(WALL_DIRECTION.WALL_RIGHT)
+		if room.y + room.height + 1 < height and not hasDoor(map, room.x, room.width, room.y + room.height, 1):
+			directions.append(WALL_DIRECTION.WALL_DOWN)
+		
+		if len(directions):
+			# choose one of the directions of room
+			direction = choice(directions)
+			if direction == WALL_DIRECTION.WALL_LEFT:
+				door_x = room.x - 1
+				door_y = randint((room.y-1)//2, (room.y + room.height - 2)//2) * 2 + 1
+			elif direction == WALL_DIRECTION.WALL_UP:
+				door_x = randint((room.x-1)//2, (room.x + room.width - 2)//2) * 2 + 1
+				door_y = room.y - 1
+			elif direction == WALL_DIRECTION.WALL_RIGHT:
+				door_x = room.x + room.width
+				door_y = randint((room.y-1)//2, (room.y + room.height - 2)//2) * 2 + 1
+			else:
+				door_x = randint((room.x-1)//2, (room.x + room.width - 2)//2) * 2 + 1
+				door_y = room.y + room.height
+		
+		map.setMap(door_x, door_y, MAP_ENTRY_TYPE.MAP_EMPTY)
+	
+	num = 0
+	for room in map.room_list:
+		num += 1
+		if num == factor:
+			createDoor(map, room, width, height)		
+			num = 0
+		
 def removeDeadEnds(map, width, height):
 	def removeDead(map, x, y, width, height):
 		map.setMap(2*x+1, 2*y+1, MAP_ENTRY_TYPE.MAP_BLOCK)

@@ -122,7 +122,7 @@ class Game():
 		if self.mode == 0:
 			self.map.resetMap(MAP_ENTRY_TYPE.MAP_BLOCK)
 			room_max_size = self.map.width//10 if self.map.width < self.map.height else self.map.height//10
-			ROOM_NUM = min(50, room_max_size*20)
+			ROOM_NUM = max(50, room_max_size*20)
 			addRooms(self.map, ROOM_NUM, room_max_size)
 			print(MOVE_DIRECTION.MOVE_RIGHT.value)
 		elif self.mode == 1:
@@ -131,7 +131,8 @@ class Game():
 		elif self.mode == 2:
 			connectRegions(self.map, (self.map.width-1)//2, (self.map.height-1)//2)
 		elif self.mode == 3:
-			addReduentConnect(self.map, (self.map.width-1)//2, (self.map.height-1)//2, 8)
+			#addReduentConnect(self.map, (self.map.width-1)//2, (self.map.height-1)//2, 8)
+			connectReduentRooms(self.map, self.map.width, self.map.height, 3)
 		elif self.mode == 4:
 			removeDeadEnds(self.map, (self.map.width-1)//2, (self.map.height-1)//2)
 		elif self.mode == 5:
